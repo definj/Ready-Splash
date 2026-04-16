@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { fallbackSectorsPayload } from "@/lib/sector-fallback";
 import { sampleTickersForSector } from "@/lib/sector-sample-tickers";
 
 type Sector = { id: string; name: string; momentum: number };
@@ -23,14 +24,24 @@ export function EmergingSectors() {
   const q = useQuery({
     queryKey: ["macro", "sectors"],
     queryFn: async (): Promise<SectorsResponse> => {
-      const res = await apiFetch("/macro/sectors");
-      if (!res.ok) {
-        await res.text().catch(() => {});
-        throw new Error("LOAD_FAILED");
+      try {
+        const res = await apiFetch("/macro/sectors");
+        if (!res.ok) {
+          await res.text().catch(() => {});
+          return fallbackSectorsPayload();
+        }
+        const data = (await res.json()) as SectorsResponse;
+        if (!Array.isArray(data.sectors) || data.sectors.length === 0) {
+          return fallbackSectorsPayload();
+        }
+        return data;
+      } catch {
+        return fallbackSectorsPayload();
       }
-      return (await res.json()) as SectorsResponse;
     },
     staleTime: 60_000,
+    retry: 2,
+    retryDelay: (i) => 600 * (i + 1),
   });
 
   const ranked = useMemo(() => {
@@ -41,8 +52,8 @@ export function EmergingSectors() {
   if (q.isLoading) {
     return <p className="text-xs text-zinc-500">Loading sectors…</p>;
   }
-  if (q.error || !q.data) {
-    return <p className="text-xs text-zinc-500">Sector view is not available right now.</p>;
+  if (!q.data) {
+    return null;
   }
 
   return (

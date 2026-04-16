@@ -6,7 +6,9 @@ import { getRedis } from "../lib/redis.js";
 import { buildAdjustedOhlcvBars, fetchDailyAggs } from "../services/polygonAggs.js";
 import { readAdjustmentBundle, syncAdjustmentCacheForTicker } from "../services/adjustmentCache.js";
 import { fetchLastTrade } from "../services/polygonRest.js";
+import { fetchYahooDailyBarsNewestFirst } from "../services/yahooChart.js";
 import { fetchYahooLast } from "../services/yahooQuote.js";
+import { fetchYahooOverview } from "../services/yahooOverview.js";
 
 export async function registerMarketRoutes(app: FastifyInstance) {
   app.get("/market/status", async () => ({
@@ -106,11 +108,16 @@ export async function registerMarketRoutes(app: FastifyInstance) {
       return body;
     }
 
-    return reply.status(503).send({
-      error: "Unable to load market data",
-      detail:
-        "Polygon and Yahoo fallbacks failed (check POLYGON_API_KEY, network, or Yahoo rate limits)",
-    });
+    return reply.status(503).send({ error: "Unable to load market data" });
+  });
+
+  app.get<{ Params: { ticker: string } }>("/market/overview/:ticker", async (request, reply) => {
+    const parsed = tickerSchema.safeParse(String(request.params.ticker ?? "").trim().toUpperCase());
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "Invalid ticker" });
+    }
+    const overview = await fetchYahooOverview(parsed.data);
+    return overview;
   });
 
   app.get<{ Querystring: { tickers?: string } }>("/market/quotes", async (request, reply) => {
@@ -165,30 +172,35 @@ export async function registerMarketRoutes(app: FastifyInstance) {
       bundle = await readAdjustmentBundle(redis, ticker);
     }
 
-    const raw = await fetchDailyAggs(ticker, limit);
+    let raw = await fetchDailyAggs(ticker, limit);
+    let barSource: "polygon" | "yahoo" = "polygon";
     if (!raw) {
-      return reply.status(503).send({ error: "Unable to load aggregates from Polygon" });
+      const yahooRaw = await fetchYahooDailyBarsNewestFirst(ticker, limit);
+      if (!yahooRaw) {
+        return reply.status(503).send({ error: "Unable to load price history" });
+      }
+      raw = yahooRaw;
+      barSource = "yahoo";
+      bundle = null;
     }
 
-    const bars = buildAdjustedOhlcvBars(raw, bundle, { splits: splitsOn, dividends: dividendsOn });
-    const disclaimerParts: string[] = [];
-    if (splitsOn) {
-      disclaimerParts.push("Split adjustment from cached Polygon splits (adj:{TICKER}).");
-    } else {
-      disclaimerParts.push("Raw split-unadjusted aggregates (adjusted=false).");
-    }
-    if (dividendsOn) {
-      disclaimerParts.push(
-        "Dividend adjustment uses cash amounts on ex-dates (backward factor on prior closes); not identical to CRSP/CSI reinvestment methodology.",
-      );
-    } else {
-      disclaimerParts.push("Dividend adjustment off unless dividends=true.");
-    }
+    const adjSplits = barSource === "polygon" ? splitsOn : false;
+    const adjDivs = barSource === "polygon" ? dividendsOn : false;
+    const bars = buildAdjustedOhlcvBars(raw, bundle, { splits: adjSplits, dividends: adjDivs });
+
+    const disclaimer =
+      barSource === "yahoo"
+        ? "Daily prices from a consolidated market feed."
+        : adjSplits
+          ? "Split-adjusted using on-file corporate action data when available."
+          : "Unadjusted split series.";
+
     return {
       ticker,
-      adjusted: splitsOn,
-      dividendsApplied: dividendsOn,
-      disclaimer: disclaimerParts.join(" "),
+      adjusted: adjSplits,
+      dividendsApplied: adjDivs,
+      barSource,
+      disclaimer,
       bars,
     };
   });
