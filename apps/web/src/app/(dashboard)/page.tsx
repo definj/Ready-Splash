@@ -1,4 +1,4 @@
-import { isMarketOpen } from "@ready-splash/indicators";
+import { isMarketOpen } from "@ready-splash/indicators/market-hours";
 import { tickerSchema } from "@ready-splash/types";
 import { MacroStrip } from "@/components/macro-strip";
 import { SectorHeatmap } from "@/components/sector-heatmap";
