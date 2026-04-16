@@ -7,59 +7,81 @@ import {
   refreshFredFeaturedToRedis,
 } from "../services/fredService.js";
 import { buildSectorHeatmapLive } from "../services/sectorLive.js";
+import { buildSectorHeatmap } from "../services/sectorMomentum.js";
 
 export async function registerMacroRoutes(app: FastifyInstance) {
-  app.get("/macro/sectors", async () => {
+  app.get("/macro/sectors", async (request) => {
     const redis = getRedis();
     let salt = "static";
     if (redis) {
-      const dgs = await redis.hgetall("fred:latest:DGS10");
-      const v = dgs.value != null ? Number(dgs.value) : NaN;
-      if (Number.isFinite(v)) {
-        salt = `dgs10:${v.toFixed(3)}`;
+      try {
+        const dgs = await redis.hgetall("fred:latest:DGS10");
+        const v = dgs.value != null ? Number(dgs.value) : NaN;
+        if (Number.isFinite(v)) {
+          salt = `dgs10:${v.toFixed(3)}`;
+        }
+      } catch (err) {
+        request.log.warn({ err }, "macro sectors: redis read failed, using static salt");
       }
     }
     const cacheKey = "sectors:heatmap:v2";
     if (redis) {
-      const hit = await redis.get(cacheKey);
-      if (hit) {
-        try {
-          return JSON.parse(hit) as { sectors: Awaited<ReturnType<typeof buildSectorHeatmapLive>>; asOf: string };
-        } catch {
-          /* fall through */
+      try {
+        const hit = await redis.get(cacheKey);
+        if (hit) {
+          try {
+            return JSON.parse(hit) as { sectors: Awaited<ReturnType<typeof buildSectorHeatmapLive>>; asOf: string };
+          } catch {
+            /* fall through */
+          }
         }
+      } catch (err) {
+        request.log.warn({ err }, "macro sectors: redis cache read failed");
       }
     }
-    const sectors = await buildSectorHeatmapLive(salt);
-    const body = { sectors, asOf: new Date().toISOString() };
-    if (redis) {
-      await redis.set(cacheKey, JSON.stringify(body), "EX", 300);
+    try {
+      const sectors = await buildSectorHeatmapLive(salt);
+      const body = { sectors, asOf: new Date().toISOString() };
+      if (redis) {
+        try {
+          await redis.set(cacheKey, JSON.stringify(body), "EX", 300);
+        } catch (err) {
+          request.log.warn({ err }, "macro sectors: redis cache write skipped");
+        }
+      }
+      return body;
+    } catch (err) {
+      request.log.error({ err }, "macro sectors: live build failed, returning static scaffold");
+      return { sectors: buildSectorHeatmap("static"), asOf: new Date().toISOString() };
     }
-    return body;
   });
 
-  app.get("/macro/featured", async (_request, reply) => {
+  app.get("/macro/featured", async (request) => {
+    const empty = () => ({ series: {} as Record<string, { date: string; value: number }>, featured: FRED_FEATURED_SERIES });
+
     const redis = getRedis();
     if (!redis) {
-      return reply.status(503).send({ error: "Redis unavailable" });
+      return empty();
     }
 
-    let cached = await readFredFeaturedFromRedis(redis);
-    const missing = FRED_FEATURED_SERIES.filter((id) => cached[id] == null);
+    try {
+      let cached = await readFredFeaturedFromRedis(redis);
+      const missing = FRED_FEATURED_SERIES.filter((id) => cached[id] == null);
 
-    if (missing.length > 0 && process.env.FRED_API_KEY) {
-      await refreshFredFeaturedToRedis(redis);
-      cached = await readFredFeaturedFromRedis(redis);
+      if (missing.length > 0 && process.env.FRED_API_KEY) {
+        await refreshFredFeaturedToRedis(redis);
+        cached = await readFredFeaturedFromRedis(redis);
+      }
+
+      if (Object.keys(cached).length === 0) {
+        return empty();
+      }
+
+      return { series: cached, featured: FRED_FEATURED_SERIES };
+    } catch (err) {
+      request.log.warn({ err }, "macro featured: redis/FRED read failed, returning empty series");
+      return empty();
     }
-
-    if (Object.keys(cached).length === 0) {
-      return reply.status(503).send({
-        error: "No FRED data available",
-        detail: process.env.FRED_API_KEY ? "FRED request failed" : "Set FRED_API_KEY to enable macro pulls",
-      });
-    }
-
-    return { series: cached, featured: FRED_FEATURED_SERIES };
   });
 
   app.get<{ Params: { seriesId: string } }>("/macro/series/:seriesId", async (request, reply) => {

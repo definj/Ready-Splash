@@ -29,7 +29,7 @@ export function SectorHeatmap() {
     return <p className="text-xs text-zinc-500">Loading sector grid…</p>;
   }
   if (q.error || !q.data) {
-    return <p className="text-xs text-amber-400">Sector heatmap unavailable.</p>;
+    return null;
   }
 
   return (
@@ -51,8 +51,7 @@ export function SectorHeatmap() {
         ))}
       </div>
       <p className="mt-2 text-[10px] text-zinc-600">
-        Deterministic scaffold scores (salted with cached FRED DGS10 when available). Replace with BullMQ sector
-        scanner output in Phase 4.
+        Momentum uses live daily bars when Polygon is configured; otherwise a deterministic placeholder grid.
       </p>
     </div>
   );
