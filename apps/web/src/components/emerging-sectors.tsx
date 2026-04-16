@@ -11,6 +11,10 @@ type Sector = { id: string; name: string; momentum: number };
 
 type SectorsResponse = { sectors: Sector[]; asOf: string };
 
+/** Native tooltip (hover) — keep under ~500 chars for older browsers. */
+const MOMENTUM_SCORE_TOOLTIP =
+  "Momentum score ranks each sector ETF by recent strength (higher = stronger uptrend). Live data: percent change from the oldest to the newest daily close in the current window (up to 10 sessions) for that sector’s benchmark ETF (e.g. XLK). If daily bars are missing or only a fallback runs, the number is a deterministic stand-in from the ETF symbol and day context—used for ordering only, not a live market return.";
+
 function heatStyle(m: number): string {
   if (m >= 3) return "border-emerald-600/60 bg-emerald-950/40";
   if (m >= 0) return "border-emerald-900/50 bg-emerald-950/20";
@@ -62,13 +66,11 @@ export function EmergingSectors() {
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Emerging sectors</h2>
           <p className="mt-1 max-w-xl text-[11px] leading-snug text-zinc-500">
-            Sectors are sorted with strongest momentum first. Open a row for example stocks in that group.
-          </p>
-          <p className="mt-2 max-w-xl text-[11px] leading-snug text-zinc-400">
-            <span className="font-medium text-zinc-300">Momentum score</span> (the number on the right) measures how
-            much that sector basket has moved recently—higher means a stronger uptrend. With live market data it is
-            close to a recent percentage change for the sector ETF; without it, the value is a stand-in used only for
-            ordering.
+            Sectors are sorted with strongest momentum first. Open a row for example stocks in that group. Hover{" "}
+            <span className="cursor-help border-b border-dotted border-zinc-500 text-zinc-400" title={MOMENTUM_SCORE_TOOLTIP}>
+              momentum score
+            </span>{" "}
+            in the header for a short definition.
           </p>
         </div>
         <span className="font-mono text-[10px] text-zinc-600">
@@ -77,11 +79,15 @@ export function EmergingSectors() {
       </div>
       <div className="mb-1.5 flex items-center justify-between border-b border-zinc-800/70 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
         <span>Sector</span>
-        <span
-          className="text-right"
-          title="Higher = stronger recent uptrend for this sector. Uses live returns when connected."
-        >
-          Momentum score
+        <span className="text-right">
+          <span
+            className="cursor-help border-b border-dotted border-zinc-500"
+            title={MOMENTUM_SCORE_TOOLTIP}
+            id="momentum-score-term"
+            aria-describedby="momentum-score-footnote"
+          >
+            Momentum score
+          </span>
         </span>
       </div>
       <ul className="space-y-2">
@@ -100,9 +106,9 @@ export function EmergingSectors() {
                     <span className="font-mono text-sm text-zinc-100">{s.id}</span>
                     <span className="mt-0.5 block text-[11px] text-zinc-400">{s.name}</span>
                   </span>
-                  <span className="shrink-0 text-right">
+                  <span className="shrink-0 text-right" title={MOMENTUM_SCORE_TOOLTIP}>
                     <span className="font-mono text-sm tabular-nums text-zinc-200">{s.momentum.toFixed(2)}</span>
-                    <span className="mt-0.5 block text-[9px] font-normal normal-case tracking-normal text-zinc-500">
+                    <span className="mt-0.5 block cursor-help text-[9px] font-normal normal-case tracking-normal text-zinc-500 underline decoration-dotted decoration-zinc-600 underline-offset-2">
                       momentum score
                     </span>
                   </span>
@@ -146,6 +152,28 @@ export function EmergingSectors() {
           );
         })}
       </ul>
+      <div
+        className="mt-4 border-t border-zinc-800/80 pt-3 text-[10px] leading-relaxed text-zinc-600"
+        id="momentum-score-footnote"
+      >
+        <p>
+          <strong className="font-medium text-zinc-500">Momentum score</strong> (the number on the right) measures
+          how much that sector basket has moved recently—higher means a stronger uptrend. With live market data it is
+          close to a recent percentage change for the sector ETF; without it, the value is a stand-in used only for
+          ordering.
+        </p>
+        <p className="mt-2">
+          <strong className="font-medium text-zinc-500">How it is calculated:</strong> Each sector uses its benchmark
+          ETF (for example XLK for technology). When daily prices are available, the score is the{" "}
+          <span className="text-zinc-500">total return in percent</span> from the{" "}
+          <span className="text-zinc-500">oldest to the newest daily close</span> in the latest window (up to{" "}
+          <span className="text-zinc-500">ten trading days</span>) for that ETF:{" "}
+          <span className="font-mono text-zinc-500">((last − first) ÷ first) × 100</span>. If that window is
+          incomplete, the API fills in with a small deterministic score derived from the ETF ticker and a daily
+          &quot;salt&quot; (so the grid still sorts)—that mode is <span className="text-zinc-500">not</span> a live
+          market percentage.
+        </p>
+      </div>
     </div>
   );
 }
