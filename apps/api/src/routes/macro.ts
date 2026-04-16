@@ -60,6 +60,24 @@ export async function registerMacroRoutes(app: FastifyInstance) {
     const empty = () => ({ series: {} as Record<string, { date: string; value: number }>, featured: FRED_FEATURED_SERIES });
 
     const redis = getRedis();
+    const hasFredKey = Boolean(process.env.FRED_API_KEY?.trim());
+
+    /** FRED without Redis cache (e.g. Redis down or not configured). */
+    if (!redis && hasFredKey) {
+      const series: Record<string, { date: string; value: number }> = {};
+      for (const id of FRED_FEATURED_SERIES) {
+        const obs = await fetchFredLatestObservation(id);
+        if (obs) series[id] = obs;
+      }
+      if (Object.keys(series).length === 0) {
+        request.log.warn(
+          "macro featured: FRED_API_KEY is set but no series returned — check key at fred.stlouisfed.org and Render logs for [fred] lines",
+        );
+        return empty();
+      }
+      return { series, featured: FRED_FEATURED_SERIES };
+    }
+
     if (!redis) {
       return empty();
     }
@@ -68,9 +86,16 @@ export async function registerMacroRoutes(app: FastifyInstance) {
       let cached = await readFredFeaturedFromRedis(redis);
       const missing = FRED_FEATURED_SERIES.filter((id) => cached[id] == null);
 
-      if (missing.length > 0 && process.env.FRED_API_KEY) {
+      if (missing.length > 0 && hasFredKey) {
         await refreshFredFeaturedToRedis(redis);
         cached = await readFredFeaturedFromRedis(redis);
+        const stillMissing = FRED_FEATURED_SERIES.filter((id) => cached[id] == null);
+        if (stillMissing.length > 0) {
+          request.log.warn(
+            { stillMissing },
+            "macro featured: Redis refresh did not populate all FRED series — see [fred] logs for API errors",
+          );
+        }
       }
 
       if (Object.keys(cached).length === 0) {

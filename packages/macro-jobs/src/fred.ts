@@ -16,7 +16,13 @@ export async function fetchFredLatestObservation(seriesId: string): Promise<Fred
   url.searchParams.set("limit", "1");
 
   const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.warn(
+      `[fred] series ${seriesId} observations HTTP ${res.status}: ${body.slice(0, 280).replace(/\s+/g, " ")}`,
+    );
+    return null;
+  }
 
   const json = (await res.json()) as {
     observations?: { date: string; value: string }[];

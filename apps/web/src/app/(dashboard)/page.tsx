@@ -1,5 +1,6 @@
 import { EmergingSectors } from "@/components/emerging-sectors";
 import { HomeWatchlist } from "@/components/home-watchlist";
+import { MacroStrip } from "@/components/macro-strip";
 import { TickerSearchBar } from "@/components/ticker-search-bar";
 
 export default function HomePage() {
@@ -12,6 +13,7 @@ export default function HomePage() {
         </p>
       </div>
       <TickerSearchBar />
+      <MacroStrip />
       <div className="grid gap-6 lg:grid-cols-2">
         <EmergingSectors />
         <HomeWatchlist />
