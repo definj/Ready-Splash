@@ -1,4 +1,6 @@
 export * from "./adjust";
+export * from "./dividendAdjust";
+export * from "./monteCarlo";
 export * from "./ma";
 export * from "./rsi";
 export * from "./macd";

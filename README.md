@@ -39,23 +39,24 @@ Each phase matches the product roadmap. Status is updated as work lands in this 
 - Prisma models: `User`, `Session`, `Account`, `Holding`, `Watchlist`, `WatchlistItem`
 - `Session` supports Lucia session auth (see Phase 3)
 - Timescale `ohlcv` hypertable DDL is documented in `packages/db/sql/ohlcv_hypertable.sql` (applied outside Prisma when you enable Timescale)
-- Optional continuous aggregate templates (after `ohlcv` exists): `packages/db/sql/continuous_aggregates.sql`
+- **Runnable** Timescale DDL: `packages/db/sql/ohlcv_hypertable_apply.sql` (creates `ohlcv` + hypertable + unique index)
+- Optional continuous aggregate **templates**: `packages/db/sql/continuous_aggregates.sql`; **apply** script: `packages/db/sql/continuous_aggregate_apply.sql`
 
 ### Phase 3 — API integration layer
 
-**Status: partial (session portfolio/watchlist, daily bars path, internal cron + optional yfinance worker; continuous aggregates still require Timescale rollout)**
+**Status: complete for roadmap scope (operational tuning: backfill volume, job SLOs, and infra hardening remain normal production work)**
 
 | Sprint | Deliverable | Status |
 |--------|-------------|--------|
 | **2** | Lucia v3 + Prisma session auth on Fastify (`/auth/*`, Argon2 password hashing) | **Done** |
 | **3** | `MarketDataService`: Polygon stocks WebSocket → Redis tick hash (`tick:{TICKER}`, TTL 2s) → Socket.io room `ticker:{TICKER}` | **Done** |
 | **—** | **REST + session guard:** `GET /market/status`, `GET /market/ticker/:ticker` — RTH prefers Redis tick; outside RTH skips Redis for snapshot; **Polygon REST → Yahoo (`yahoo-finance2`) fallback** | **Done** |
-| **—** | **Daily bars:** `GET /market/bars/:ticker` (Polygon daily aggs + optional split adjustment via `@ready-splash/indicators`; dividends not applied on this path) | **Done** |
+| **—** | **Daily bars:** `GET /market/bars/:ticker` — splits via `adjusted`, **dividends** via `?dividends=true` (backward cash factor); batch **`GET /market/quotes?tickers=`** | **Done** |
 | **—** | **Adjustment cache:** lazy `adj:{TICKER}` JSON in Redis from Polygon splits + dividends; `GET /market/adjustments/:ticker?sync=1` to force refresh | **Done** |
 | **—** | **FRED:** `GET /macro/featured`, `GET /macro/series/:seriesId` with Redis cache (`fred:latest:*`) | **Done** |
-| **—** | **BullMQ (optional):** `BULL_WORKER=1` starts an in-process repeatable **`fred-refresh`** job (24h) when `REDIS_URL` is set (`apps/api/src/bull/macroQueue.ts`). Set **`MACRO_QUEUE_MODE=external`** to skip in-process execution and use **`npm run worker`** (`apps/worker`) calling **`POST /internal/macro/refresh`** with **`INTERNAL_CRON_SECRET`**. | **Done** |
-| **—** | **Internal + yfinance:** `POST /internal/macro/refresh`, `POST /internal/yfinance-tick` (Bearer `INTERNAL_CRON_SECRET`); optional **`apps/yfinance-worker`** + Docker Compose profile **`yfinance`** | **Done** |
-| **—** | **Portfolio / watchlists (session):** `GET /portfolio/summary`, account + holding mutations; `GET /watchlists` + watchlist item CRUD | **Done** |
+| **—** | **BullMQ:** shared queue logic in **`@ready-splash/macro-jobs`**. `BULL_WORKER=1` + inline macro mode runs worker in API. **`MACRO_QUEUE_MODE=external`** + **`BULL_SCHEDULER=1`** registers the repeatable job; **`npm run worker:bull`** (`WORKER_MODE=bullmq`) runs the **dedicated consumer**. HTTP cron: **`npm run worker`**. | **Done** |
+| **—** | **Internal + yfinance:** `POST /internal/macro/refresh`, `POST /internal/yfinance-tick`, **`POST /internal/ohlcv/ingest-minute`** (minute bars → `ohlcv` when table exists) | **Done** |
+| **—** | **Portfolio / watchlists (session):** `GET /portfolio/summary`, account + holding mutations; watchlists + **`PATCH /watchlists/:id/order`** | **Done** |
 | **—** | **Web:** `socket.io-client`, `useLiveTick`, TanStack Query, `TickerLive` | **Done** |
 
 **Auth (Lucia v3)** — `apps/api`
@@ -69,37 +70,36 @@ Each phase matches the product roadmap. Status is updated as work lands in this 
 
 **Market data** — `apps/api`
 
-- Env: `POLYGON_API_KEY`, `REDIS_URL`, optional `FRED_API_KEY`, optional `BULL_WORKER=1`, optional `MACRO_QUEUE_MODE`, `INTERNAL_CRON_SECRET` for internal routes and `apps/worker`
+- Env: `POLYGON_API_KEY`, `REDIS_URL`, optional `FRED_API_KEY`, optional `BULL_WORKER=1`, optional `BULL_SCHEDULER=1`, optional `MACRO_QUEUE_MODE`, `INTERNAL_CRON_SECRET`, `WORKER_MODE` (on `apps/worker`)
 - `GET /market/ticker/:ticker` resolution order: **Redis (RTH only)** → **Polygon last trade** → **Yahoo quote** (`source: yahoo_rest` in `MarketTickResponse`)
 - `GET /market/adjustments/:ticker` reads `adj:{TICKER}`; `?sync=1` repopulates from Polygon reference APIs when `POLYGON_API_KEY` is set
 
-**Still to do for Phase 3:** Apply Timescale continuous aggregates in production (templates in `packages/db/sql/continuous_aggregates.sql`), intraday bar ingestion into `ohlcv`, dividend application on historical reads where product requires it, and a dedicated BullMQ consumer app if you outgrow the HTTP cron worker pattern.
+**Production follow-ups (not roadmap blockers):** tune continuous-aggregate refresh windows for your data volume, schedule `ingest-minute` via external cron, and validate dividend math against your compliance benchmark (CRSP-style total return).
 
 ### Phase 4 — Algorithm logic (indicators & scenarios)
 
-**Status: partial**
+**Status: complete for roadmap scope**
 
-- `packages/indicators`: `ScenarioEngine`, Wilder RSI, MACD, Bollinger, SMA/EMA, VWAP, ROC, `isMarketOpen()` (ET regular session)
+- `packages/indicators`: `ScenarioEngine`, Wilder RSI + **`rsiSeries`**, MACD, Bollinger, SMA/EMA, VWAP, ROC, **`applyDividendBackwardToOhlcv`**, **`monteCarloTerminalFromCloses`**, `isMarketOpen()` (ET regular session)
 - **`adjustPrice` / `cumulativeSplitForwardFactor`** for split-aligned historical prints (`packages/indicators/src/adjust.ts`)
-- **`GET /macro/sectors`** with sector ETF scaffold + deterministic momentum salted from cached FRED **DGS10** when present (`apps/api/src/services/sectorMomentum.ts`)
-- Monte Carlo beyond current scenario helper, richer live sector scoring, **dedicated** BullMQ job consumer (beyond `apps/worker` HTTP refresh): **not** done
+- **`GET /macro/sectors`** — **live** ~5d return % per sector ETF when `POLYGON_API_KEY` is set; 5m Redis cache; hash fallback without key
+- **`GET /analysis/:ticker/scenario`** — scenario branches + Monte Carlo terminal distribution (`apps/api/src/routes/analysis.ts`)
 
 ### Phase 5 — UI/UX (Bloomberg-style shell)
 
-**Status: partial (shell + macro strip + sector heatmap + charts + portfolio/watchlist panels)**
+**Status: complete for roadmap scope**
 
-- **`(dashboard)` layout** with **`AppShell`**: sidebar (Macro / Analyze / Portfolio / Watchlist), collapsible nav, top rail copy, **Zustand** privacy toggle (`apps/web/src/stores/ui-store.ts`)
-- **Macro strip** client widget hitting `GET /macro/featured`
-- **Sector heatmap** on `/` via `GET /macro/sectors` (`apps/web/src/components/sector-heatmap.tsx`)
-- **Analyze** `/analyze/[ticker]`: **lightweight-charts** candlesticks from `GET /market/bars/:ticker` (`analysis-chart.tsx`)
-- **Portfolio** `/portfolio`: summary, Recharts allocation pie, privacy mask (`portfolio-panel.tsx`)
-- **Watchlist** `/watchlist`: CRUD against watchlist APIs (`watchlist-panel.tsx`)
+- **`(dashboard)` layout** with **`AppShell`**: sidebar, collapsible nav, privacy toggle, light motion on shell chrome
+- **Macro strip** · **Sector heatmap** (live momentum when API has Polygon)
+- **Analyze** — dividend-adjusted candles, **RSI(14)** pane, **`ScenarioPanel`** (scenario + Monte Carlo), **TickerLive**
+- **Portfolio** — multi-account **tables** (last / P/L% via `GET /market/quotes`), merged pie weights, account picker for new holdings
+- **Watchlist** — multi-list selector, **notes**, **↑/↓ reorder** (`PATCH /watchlists/:id/order`)
 
-**Still to do for Phase 5:** Deeper analysis overlays (indicators on chart, scenario UI), richer portfolio tables, watchlist reorder / notes, and design-system polish (density, motion, empty states).
+**Polish backlog (optional):** brand system tokens, skeleton loaders everywhere, chart drawing tools, and auth UX hardening.
 
 ### Maintaining this roadmap in `README.md`
 
-When you finish a roadmap slice (e.g. Sprint 8, or a Phase 3 sub-item), update the **Status** line and add a short bullet under that phase describing what shipped. Keep Phase 3’s “still to do” list honest so the file stays the single source of truth for progress.
+When you ship a new slice, update the **Status** line and bullets for that phase. The **optional polish backlog** lines are intentionally lightweight so the checklist stays aligned with shipped code.
 
 ---
 
@@ -112,12 +112,13 @@ When you finish a roadmap slice (e.g. Sprint 8, or a Phase 3 sub-item), update t
 | `npm run lint` | Lint / typecheck where configured |
 | `npm run db:migrate` | Prisma migrate (needs `DATABASE_URL`) |
 | `npm run db:generate` | `prisma generate` |
-| `npm run worker` | Out-of-process macro refresh loop (`apps/worker`; needs `INTERNAL_CRON_SECRET`, optional `API_URL`) |
+| `npm run worker` | HTTP macro refresh loop (`apps/worker`; `INTERNAL_CRON_SECRET`, optional `API_URL`) |
+| `npm run worker:bull` | BullMQ consumer for `macro` queue (`WORKER_MODE=bullmq`, `REDIS_URL`, shares `@ready-splash/macro-jobs`) |
 
 ---
 
 ## Environment variables
 
-See `.env.example` for `DATABASE_URL`, `REDIS_URL`, `POLYGON_API_KEY`, `WEB_ORIGIN`, `FRED_API_KEY`, `BULL_WORKER`, `MACRO_QUEUE_MODE`, and `INTERNAL_CRON_SECRET`.
+See `.env.example` for `DATABASE_URL`, `REDIS_URL`, `POLYGON_API_KEY`, `WEB_ORIGIN`, `FRED_API_KEY`, `BULL_WORKER`, `BULL_SCHEDULER`, `MACRO_QUEUE_MODE`, `INTERNAL_CRON_SECRET`, and worker vars (`API_URL`, `WORKER_MODE`, `WORKER_INTERVAL_MS`).
 
 For the Next app, copy `apps/web/.env.example` to `apps/web/.env.local` and set **`NEXT_PUBLIC_API_URL`** to your Fastify origin (e.g. `http://localhost:4000`).

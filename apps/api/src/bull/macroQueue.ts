@@ -1,13 +1,22 @@
-import { Queue, Worker } from "bullmq";
+import { createFredMacroWorker, registerFredRepeatableJob, type MacroJobLog } from "@ready-splash/macro-jobs";
 import IORedis from "ioredis";
 import type { FastifyBaseLogger } from "fastify";
-import { refreshFredFeaturedToRedis } from "../services/fredService.js";
+
+function toMacroLog(log: FastifyBaseLogger): MacroJobLog {
+  return {
+    info: (obj, msg) => {
+      log.info(obj, msg);
+    },
+    error: (obj, msg) => {
+      log.error(obj, msg);
+    },
+  };
+}
 
 /**
- * Starts a BullMQ worker + repeatable `fred-refresh` job when `BULL_WORKER=1` and `REDIS_URL` are set.
- * Uses its own Redis connection (`maxRetriesPerRequest: null`) as required by BullMQ.
+ * Registers the repeatable FRED job and starts a BullMQ worker in-process (API process).
  */
-export function startMacroBullWorker(log: FastifyBaseLogger): void {
+export async function startMacroBullWorker(log: FastifyBaseLogger): Promise<void> {
   const url = process.env.REDIS_URL;
   if (!url) {
     log.warn("BULL_WORKER enabled but REDIS_URL missing — macro queue not started");
@@ -15,30 +24,22 @@ export function startMacroBullWorker(log: FastifyBaseLogger): void {
   }
 
   const connection = new IORedis(url, { maxRetriesPerRequest: null });
-
-  const worker = new Worker(
-    "macro",
-    async (job) => {
-      if (job.name === "fred-refresh") {
-        await refreshFredFeaturedToRedis(connection);
-      }
-    },
-    { connection },
-  );
-
-  worker.on("failed", (job, err) => {
-    log.error({ err, jobId: job?.id, name: job?.name }, "macro worker job failed");
-  });
-
-  const queue = new Queue("macro", { connection });
-  void queue.add(
-    "fred-refresh",
-    {},
-    {
-      repeat: { every: 86_400_000 },
-      jobId: "fred-refresh-daily",
-    },
-  );
+  await registerFredRepeatableJob(connection);
+  createFredMacroWorker(connection, toMacroLog(log));
 
   log.info("Macro BullMQ worker online (repeatable fred-refresh / 24h)");
+}
+
+/**
+ * Registers the repeatable job only (no Worker). Use with `apps/worker` WORKER_MODE=bullmq.
+ */
+export async function registerMacroRepeatableJobOnly(log: FastifyBaseLogger): Promise<void> {
+  const url = process.env.REDIS_URL;
+  if (!url) {
+    log.warn("BULL_SCHEDULER enabled but REDIS_URL missing — macro repeatable job not registered");
+    return;
+  }
+  const connection = new IORedis(url, { maxRetriesPerRequest: null });
+  await registerFredRepeatableJob(connection);
+  log.info("Macro repeatable fred-refresh job registered (external worker expected)");
 }

@@ -2,6 +2,8 @@ import { tickerSchema } from "@ready-splash/types";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getRedis } from "../lib/redis.js";
+import { fetchMinuteAggsAsc } from "../services/polygonAggs.js";
+import { ohlcvTableExists, upsertOhlcvMinuteRows } from "../services/ohlcvIngest.js";
 import { refreshFredFeaturedToRedis } from "../services/fredService.js";
 
 function bearerToken(authorization: string | undefined): string | null {
@@ -66,5 +68,41 @@ export async function registerInternalRoutes(app: FastifyInstance) {
       .expire(key, 30)
       .exec();
     return { ok: true, ticker };
+  });
+
+  const ohlcvBody = z.object({
+    ticker: tickerSchema,
+    lookbackMinutes: z.coerce.number().int().min(5).max(10_080).optional().default(240),
+  });
+
+  app.post("/internal/ohlcv/ingest-minute", async (request, reply) => {
+    const secret = process.env.INTERNAL_CRON_SECRET;
+    if (!secret) {
+      return reply.status(503).send({ error: "INTERNAL_CRON_SECRET not configured" });
+    }
+    const token = bearerToken(request.headers.authorization);
+    if (!token || token !== secret) {
+      return reply.status(401).send({ error: "Invalid token" });
+    }
+    const parsed = ohlcvBody.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "Invalid body", details: parsed.error.flatten() });
+    }
+    const exists = await ohlcvTableExists();
+    if (!exists) {
+      return reply.status(503).send({
+        error: "ohlcv table missing",
+        hint: "Apply packages/db/sql/ohlcv_hypertable_apply.sql to your Timescale database",
+      });
+    }
+    const { ticker, lookbackMinutes } = parsed.data as { ticker: string; lookbackMinutes: number };
+    const to = Date.now();
+    const from = to - lookbackMinutes * 60_000;
+    const bars = await fetchMinuteAggsAsc(ticker, from, to);
+    if (!bars?.length) {
+      return reply.status(503).send({ error: "No minute bars from Polygon", ticker });
+    }
+    const inserted = await upsertOhlcvMinuteRows(ticker, bars);
+    return { ok: true, ticker, rows: inserted };
   });
 }

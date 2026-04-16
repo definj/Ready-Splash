@@ -1,7 +1,8 @@
 "use client";
 
+import { rsiSeries } from "@ready-splash/indicators";
 import { useQuery } from "@tanstack/react-query";
-import { CandlestickSeries, ColorType, createChart } from "lightweight-charts";
+import { CandlestickSeries, ColorType, createChart, LineSeries } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 
@@ -13,25 +14,60 @@ type BarsResponse = {
   disclaimer?: string;
 };
 
+function businessDayTime(ms: number) {
+  const d = new Date(ms);
+  return {
+    year: d.getUTCFullYear(),
+    month: d.getUTCMonth() + 1,
+    day: d.getUTCDate(),
+  } as const;
+}
+
 export function AnalysisChart({ ticker }: { ticker: string }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  const candleRef = useRef<HTMLDivElement | null>(null);
+  const rsiRef = useRef<HTMLDivElement | null>(null);
+  const candleChartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  const rsiChartRef = useRef<ReturnType<typeof createChart> | null>(null);
 
   const q = useQuery({
-    queryKey: ["bars", ticker],
+    queryKey: ["bars", ticker, "div"],
     queryFn: async (): Promise<BarsResponse> => {
-      const res = await apiFetch(`/market/bars/${encodeURIComponent(ticker)}?limit=180&adjusted=true`);
+      const res = await apiFetch(
+        `/market/bars/${encodeURIComponent(ticker)}?limit=180&adjusted=true&dividends=true`,
+      );
       if (!res.ok) throw new Error(await res.text());
       return (await res.json()) as BarsResponse;
     },
   });
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !q.data?.bars?.length) return;
+    const cEl = candleRef.current;
+    const rEl = rsiRef.current;
+    if (!cEl || !rEl || !q.data?.bars?.length) return;
 
-    chartRef.current?.remove();
-    const chart = createChart(el, {
+    candleChartRef.current?.remove();
+    rsiChartRef.current?.remove();
+
+    const asc = [...q.data.bars].reverse();
+    const candleData = asc.map((b) => ({
+      time: businessDayTime(b.t),
+      open: b.o,
+      high: b.h,
+      low: b.l,
+      close: b.c,
+    }));
+
+    const closes = asc.map((b) => b.c);
+    const rsiVals = rsiSeries(closes, 14);
+    const rsiData = asc
+      .map((b, i) => {
+        const v = rsiVals[i];
+        if (v == null || !Number.isFinite(v)) return null;
+        return { time: businessDayTime(b.t), value: v };
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+
+    const chartBase = {
       layout: {
         background: { type: ColorType.Solid, color: "#09090b" },
         textColor: "#a1a1aa",
@@ -42,48 +78,44 @@ export function AnalysisChart({ ticker }: { ticker: string }) {
       },
       rightPriceScale: { borderColor: "#27272a" },
       timeScale: { borderColor: "#27272a" },
-      height: 360,
-    });
-    chartRef.current = chart;
+    };
 
-    const series = chart.addSeries(CandlestickSeries, {
+    const cChart = createChart(cEl, { ...chartBase, height: 320 });
+    candleChartRef.current = cChart;
+    const cSeries = cChart.addSeries(CandlestickSeries, {
       upColor: "#22c55e",
       downColor: "#f43f5e",
       borderVisible: false,
       wickUpColor: "#22c55e",
       wickDownColor: "#f43f5e",
     });
+    cSeries.setData(candleData);
+    cChart.timeScale().fitContent();
 
-    const data = [...q.data.bars]
-      .reverse()
-      .map((b) => {
-        const d = new Date(b.t);
-        return {
-          time: {
-            year: d.getUTCFullYear(),
-            month: d.getUTCMonth() + 1,
-            day: d.getUTCDate(),
-          } as const,
-          open: b.o,
-          high: b.h,
-          low: b.l,
-          close: b.c,
-        };
-      });
-
-    series.setData(data);
-    chart.timeScale().fitContent();
+    const rChart = createChart(rEl, { ...chartBase, height: 120 });
+    rsiChartRef.current = rChart;
+    const rSeries = rChart.addSeries(LineSeries, {
+      color: "#a78bfa",
+      lineWidth: 1,
+    });
+    rSeries.setData(rsiData);
+    rChart.timeScale().fitContent();
 
     const ro = new ResizeObserver(() => {
-      chart.applyOptions({ width: el.clientWidth });
+      const w = cEl.clientWidth;
+      cChart.applyOptions({ width: w });
+      rChart.applyOptions({ width: w });
     });
-    ro.observe(el);
-    chart.applyOptions({ width: el.clientWidth });
+    ro.observe(cEl);
+    cChart.applyOptions({ width: cEl.clientWidth });
+    rChart.applyOptions({ width: cEl.clientWidth });
 
     return () => {
       ro.disconnect();
-      chart.remove();
-      chartRef.current = null;
+      cChart.remove();
+      rChart.remove();
+      candleChartRef.current = null;
+      rsiChartRef.current = null;
     };
   }, [q.data]);
 
@@ -98,7 +130,9 @@ export function AnalysisChart({ ticker }: { ticker: string }) {
       {q.data?.disclaimer && (
         <p className="text-[10px] leading-relaxed text-zinc-600">{q.data.disclaimer}</p>
       )}
-      <div ref={containerRef} className="w-full rounded border border-zinc-800" />
+      <div ref={candleRef} className="w-full rounded border border-zinc-800" />
+      <div className="text-[10px] uppercase tracking-wide text-zinc-500">RSI (14)</div>
+      <div ref={rsiRef} className="w-full rounded border border-zinc-800" />
     </div>
   );
 }

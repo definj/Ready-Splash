@@ -63,6 +63,7 @@ model WatchlistItem {
   ticker      String
   notes       String?
   alertPrice  Decimal?  @db.Decimal(18, 4)
+  sortOrder   Int       @default(0)
   addedAt     DateTime  @default(now())
   watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
 

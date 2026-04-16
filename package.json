@@ -9,7 +9,8 @@
     "db:generate": "npm run db:generate -w @ready-splash/db",
     "db:migrate": "npm run db:migrate -w @ready-splash/db",
     "db:push": "npm run db:push -w @ready-splash/db",
-    "worker": "npm run start -w @ready-splash/worker"
+    "worker": "npm run start -w @ready-splash/worker",
+    "worker:bull": "WORKER_MODE=bullmq npm run start -w @ready-splash/worker"
   },
   "devDependencies": {
     "turbo": "^2.4.4",

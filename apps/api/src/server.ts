@@ -5,12 +5,13 @@ import { isMarketOpen } from "@ready-splash/indicators";
 import { Server } from "socket.io";
 import { prisma } from "./lib/prisma.js";
 import { disconnectRedis, getRedis } from "./lib/redis.js";
-import { startMacroBullWorker } from "./bull/macroQueue.js";
+import { registerMacroRepeatableJobOnly, startMacroBullWorker } from "./bull/macroQueue.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerInternalRoutes } from "./routes/internal.js";
 import { registerMacroRoutes } from "./routes/macro.js";
 import { registerMarketRoutes } from "./routes/market.js";
 import { registerPortfolioRoutes } from "./routes/portfolio.js";
+import { registerAnalysisRoutes } from "./routes/analysis.js";
 import { registerWatchlistRoutes } from "./routes/watchlists.js";
 import { MarketDataService } from "./services/marketDataService.js";
 
@@ -27,6 +28,7 @@ await app.register(cors, {
 await registerAuthRoutes(app);
 await registerMarketRoutes(app);
 await registerMacroRoutes(app);
+await registerAnalysisRoutes(app);
 await registerPortfolioRoutes(app);
 await registerWatchlistRoutes(app);
 await registerInternalRoutes(app);
@@ -64,10 +66,16 @@ if (process.env.POLYGON_API_KEY) {
 }
 
 const macroQueueMode = process.env.MACRO_QUEUE_MODE ?? "inline";
+const bullScheduler = process.env.BULL_SCHEDULER === "1";
+
 if (process.env.BULL_WORKER === "1" && macroQueueMode !== "external") {
-  startMacroBullWorker(app.log);
+  void startMacroBullWorker(app.log);
 } else if (process.env.BULL_WORKER === "1" && macroQueueMode === "external") {
-  app.log.warn("BULL_WORKER=1 but MACRO_QUEUE_MODE=external — start `apps/worker` for BullMQ execution");
+  app.log.warn("BULL_WORKER=1 but MACRO_QUEUE_MODE=external — use BULL_SCHEDULER=1 here and WORKER_MODE=bullmq on `apps/worker`, or HTTP `npm run worker`");
+}
+
+if (macroQueueMode === "external" && bullScheduler) {
+  void registerMacroRepeatableJobOnly(app.log);
 }
 
 io.on("connection", (socket) => {

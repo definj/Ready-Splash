@@ -6,10 +6,10 @@ import {
   readFredFeaturedFromRedis,
   refreshFredFeaturedToRedis,
 } from "../services/fredService.js";
-import { buildSectorHeatmap } from "../services/sectorMomentum.js";
+import { buildSectorHeatmapLive } from "../services/sectorLive.js";
 
 export async function registerMacroRoutes(app: FastifyInstance) {
-  app.get("/macro/sectors", async (_request, reply) => {
+  app.get("/macro/sectors", async () => {
     const redis = getRedis();
     let salt = "static";
     if (redis) {
@@ -19,7 +19,23 @@ export async function registerMacroRoutes(app: FastifyInstance) {
         salt = `dgs10:${v.toFixed(3)}`;
       }
     }
-    return { sectors: buildSectorHeatmap(salt), asOf: new Date().toISOString() };
+    const cacheKey = "sectors:heatmap:v2";
+    if (redis) {
+      const hit = await redis.get(cacheKey);
+      if (hit) {
+        try {
+          return JSON.parse(hit) as { sectors: Awaited<ReturnType<typeof buildSectorHeatmapLive>>; asOf: string };
+        } catch {
+          /* fall through */
+        }
+      }
+    }
+    const sectors = await buildSectorHeatmapLive(salt);
+    const body = { sectors, asOf: new Date().toISOString() };
+    if (redis) {
+      await redis.set(cacheKey, JSON.stringify(body), "EX", 300);
+    }
+    return body;
   });
 
   app.get("/macro/featured", async (_request, reply) => {

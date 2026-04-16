@@ -26,6 +26,8 @@ services:
       API_URL: http://host.docker.internal:4000
       INTERNAL_CRON_SECRET: ${INTERNAL_CRON_SECRET:-}
       WORKER_INTERVAL_MS: "3600000"
+      WORKER_MODE: ${WORKER_MODE:-http}
+      REDIS_URL: redis://redis:6379
     volumes:
       - ./:/repo
     command: ["bash", "-lc", "cd /repo && npm run worker"]

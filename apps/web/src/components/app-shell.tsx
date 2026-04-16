@@ -21,7 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen bg-zinc-950 text-zinc-100">
       <aside
-        className={`border-r border-zinc-800 bg-zinc-950/80 transition-[width] duration-200 ${
+        className={`border-r border-zinc-800 bg-zinc-950/80 transition-[width] duration-300 ease-out ${
           sidebarOpen ? "w-56 px-4 py-5" : "w-0 overflow-hidden border-0 px-0 py-5"
         }`}
       >
@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Privacy {privacyMode ? "on" : "off"}
           </button>
         </header>
-        <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-4 transition-colors duration-200 sm:p-6">{children}</main>
       </div>
     </div>
   );

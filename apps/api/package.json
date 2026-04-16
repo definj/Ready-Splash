@@ -15,6 +15,7 @@
     "@lucia-auth/adapter-prisma": "^4.0.1",
     "@ready-splash/db": "^0.0.0",
     "@ready-splash/indicators": "*",
+    "@ready-splash/macro-jobs": "*",
     "@ready-splash/types": "*",
     "argon2": "^0.44.0",
     "bullmq": "^5.74.1",

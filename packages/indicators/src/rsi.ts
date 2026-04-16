@@ -33,3 +33,38 @@ export function rsi(
   const rs = avgGain / avgLoss;
   return 100 - 100 / (1 + rs);
 }
+
+/** Wilder RSI value at each index (NaN until the first full `period` returns exist). */
+export function rsiSeries(closes: number[], period = 14): number[] {
+  const n = closes.length;
+  const out = new Array<number>(n).fill(Number.NaN);
+  if (n < period + 1) return out;
+
+  let gains = 0;
+  let losses = 0;
+  for (let i = 1; i <= period; i++) {
+    const ch = closes[i]! - closes[i - 1]!;
+    if (ch >= 0) gains += ch;
+    else losses -= ch;
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  const rsiVal = (ag: number, al: number) => {
+    if (al === 0) return 100;
+    const rs = ag / al;
+    return 100 - 100 / (1 + rs);
+  };
+
+  out[period] = rsiVal(avgGain, avgLoss);
+
+  for (let i = period + 1; i < n; i++) {
+    const ch = closes[i]! - closes[i - 1]!;
+    const g = ch > 0 ? ch : 0;
+    const l = ch < 0 ? -ch : 0;
+    avgGain = (avgGain * (period - 1) + g) / period;
+    avgLoss = (avgLoss * (period - 1) + l) / period;
+    out[i] = rsiVal(avgGain, avgLoss);
+  }
+  return out;
+}

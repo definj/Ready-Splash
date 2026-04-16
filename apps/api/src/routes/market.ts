@@ -3,7 +3,7 @@ import type { MarketTickResponse } from "@ready-splash/types";
 import { tickerSchema } from "@ready-splash/types";
 import type { FastifyInstance } from "fastify";
 import { getRedis } from "../lib/redis.js";
-import { applySplitAdjustmentsToBars, fetchDailyAggs } from "../services/polygonAggs.js";
+import { buildAdjustedOhlcvBars, fetchDailyAggs } from "../services/polygonAggs.js";
 import { readAdjustmentBundle, syncAdjustmentCacheForTicker } from "../services/adjustmentCache.js";
 import { fetchLastTrade } from "../services/polygonRest.js";
 import { fetchYahooLast } from "../services/yahooQuote.js";
@@ -113,9 +113,37 @@ export async function registerMarketRoutes(app: FastifyInstance) {
     });
   });
 
+  app.get<{ Querystring: { tickers?: string } }>("/market/quotes", async (request, reply) => {
+    const raw = String(request.query.tickers ?? "");
+    const tickers = raw
+      .split(",")
+      .map((t) => t.trim().toUpperCase())
+      .filter((t) => t.length > 0)
+      .slice(0, 30);
+    if (tickers.length === 0) {
+      return reply.status(400).send({ error: "Provide tickers=comma,separated" });
+    }
+    const out: Array<{ ticker: string; price: number; ts: number; source: string }> = [];
+    for (const ticker of tickers) {
+      const parsed = tickerSchema.safeParse(ticker);
+      if (!parsed.success) continue;
+      const t = parsed.data;
+      const last = await fetchLastTrade(t);
+      if (last) {
+        out.push({ ticker: t, price: last.price, ts: last.ts, source: "polygon_rest" });
+        continue;
+      }
+      const y = await fetchYahooLast(t);
+      if (y) {
+        out.push({ ticker: t, price: y.price, ts: y.ts, source: "yahoo_rest" });
+      }
+    }
+    return { quotes: out };
+  });
+
   app.get<{
     Params: { ticker: string };
-    Querystring: { limit?: string; adjusted?: string };
+    Querystring: { limit?: string; adjusted?: string; dividends?: string };
   }>("/market/bars/:ticker", async (request, reply) => {
     const parsed = tickerSchema.safeParse(String(request.params.ticker ?? "").trim().toUpperCase());
     if (!parsed.success) {
@@ -123,11 +151,12 @@ export async function registerMarketRoutes(app: FastifyInstance) {
     }
     const ticker = parsed.data;
     const limit = Math.min(500, Math.max(1, Number.parseInt(String(request.query.limit ?? "120"), 10) || 120));
-    const adjusted = String(request.query.adjusted ?? "true") !== "false";
+    const splitsOn = String(request.query.adjusted ?? "true") !== "false";
+    const dividendsOn = String(request.query.dividends ?? "false") === "true";
 
     const redis = getRedis();
     let bundle = redis ? await readAdjustmentBundle(redis, ticker) : null;
-    if (adjusted && redis && process.env.POLYGON_API_KEY && !bundle) {
+    if ((splitsOn || dividendsOn) && redis && process.env.POLYGON_API_KEY && !bundle) {
       try {
         await syncAdjustmentCacheForTicker(ticker, redis);
       } catch {
@@ -141,14 +170,25 @@ export async function registerMarketRoutes(app: FastifyInstance) {
       return reply.status(503).send({ error: "Unable to load aggregates from Polygon" });
     }
 
-    const bars = applySplitAdjustmentsToBars(raw, bundle, adjusted);
+    const bars = buildAdjustedOhlcvBars(raw, bundle, { splits: splitsOn, dividends: dividendsOn });
+    const disclaimerParts: string[] = [];
+    if (splitsOn) {
+      disclaimerParts.push("Split adjustment from cached Polygon splits (adj:{TICKER}).");
+    } else {
+      disclaimerParts.push("Raw split-unadjusted aggregates (adjusted=false).");
+    }
+    if (dividendsOn) {
+      disclaimerParts.push(
+        "Dividend adjustment uses cash amounts on ex-dates (backward factor on prior closes); not identical to CRSP/CSI reinvestment methodology.",
+      );
+    } else {
+      disclaimerParts.push("Dividend adjustment off unless dividends=true.");
+    }
     return {
       ticker,
-      adjusted,
-      dividendsApplied: false,
-      disclaimer: adjusted
-        ? "Split adjustment applied using cached Polygon splits (adj:{TICKER}); dividend reinvestment not applied in this endpoint."
-        : "Raw split-unadjusted aggregates as returned by Polygon (adjusted=false).",
+      adjusted: splitsOn,
+      dividendsApplied: dividendsOn,
+      disclaimer: disclaimerParts.join(" "),
       bars,
     };
   });

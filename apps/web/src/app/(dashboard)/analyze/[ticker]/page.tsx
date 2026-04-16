@@ -1,6 +1,7 @@
 import { tickerSchema } from "@ready-splash/types";
 import { notFound } from "next/navigation";
 import { AnalysisChart } from "@/components/analysis-chart";
+import { ScenarioPanel } from "@/components/scenario-panel";
 import { TickerLive } from "@/components/ticker-live";
 
 type PageProps = { params: { ticker: string } };
@@ -16,10 +17,11 @@ export default function AnalyzePage({ params }: PageProps) {
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">Analysis · {parsed.data}</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Candlestick module (split-adjusted daily bars) + live tape; fundamentals and scenario cards next.
+          Split- and dividend-adjusted daily bars, RSI, scenario branches, Monte Carlo fan, and live tape.
         </p>
       </div>
       <AnalysisChart ticker={parsed.data} />
+      <ScenarioPanel ticker={parsed.data} />
       <TickerLive ticker={parsed.data} />
     </div>
   );
