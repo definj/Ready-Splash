@@ -13,21 +13,78 @@ export const SECTORS_META: readonly { id: string; name: string }[] = [
   { id: "XLC", name: "Communication Services" },
 ] as const;
 
-/** Representative liquid names per sector ETF — for navigation into analysis, not exhaustive holdings. */
-export const SECTOR_SAMPLE_TICKERS: Record<string, readonly string[]> = {
-  XLK: ["AAPL", "MSFT", "NVDA", "AVGO"],
-  XLF: ["JPM", "BAC", "GS", "MS"],
-  XLV: ["UNH", "JNJ", "LLY", "MRK"],
-  XLY: ["AMZN", "TSLA", "HD", "MCD"],
-  XLP: ["PG", "KO", "WMT", "COST"],
-  XLE: ["XOM", "CVX", "COP", "SLB"],
-  XLI: ["CAT", "HON", "UPS", "DE"],
-  XLB: ["LIN", "APD", "SHW", "ECL"],
-  XLU: ["NEE", "DUK", "SO", "AEP"],
-  XLRE: ["PLD", "AMT", "EQIX", "PSA"],
-  XLC: ["META", "GOOGL", "NFLX", "DIS"],
+export type SampleTicker = { symbol: string; label: string };
+
+/** Representative large-cap names per sector — symbol plus a short plain-language label. */
+export const SECTOR_SAMPLE_TICKERS: Record<string, readonly SampleTicker[]> = {
+  XLK: [
+    { symbol: "AAPL", label: "Apple" },
+    { symbol: "MSFT", label: "Microsoft" },
+    { symbol: "NVDA", label: "NVIDIA" },
+    { symbol: "AVGO", label: "Broadcom" },
+  ],
+  XLF: [
+    { symbol: "JPM", label: "JPMorgan Chase" },
+    { symbol: "BAC", label: "Bank of America" },
+    { symbol: "GS", label: "Goldman Sachs" },
+    { symbol: "MS", label: "Morgan Stanley" },
+  ],
+  XLV: [
+    { symbol: "UNH", label: "UnitedHealth" },
+    { symbol: "JNJ", label: "Johnson & Johnson" },
+    { symbol: "LLY", label: "Eli Lilly" },
+    { symbol: "MRK", label: "Merck" },
+  ],
+  XLY: [
+    { symbol: "AMZN", label: "Amazon" },
+    { symbol: "TSLA", label: "Tesla" },
+    { symbol: "HD", label: "Home Depot" },
+    { symbol: "MCD", label: "McDonald's" },
+  ],
+  XLP: [
+    { symbol: "PG", label: "Procter & Gamble" },
+    { symbol: "KO", label: "Coca-Cola" },
+    { symbol: "WMT", label: "Walmart" },
+    { symbol: "COST", label: "Costco" },
+  ],
+  XLE: [
+    { symbol: "XOM", label: "ExxonMobil" },
+    { symbol: "CVX", label: "Chevron" },
+    { symbol: "COP", label: "ConocoPhillips" },
+    { symbol: "SLB", label: "SLB" },
+  ],
+  XLI: [
+    { symbol: "CAT", label: "Caterpillar" },
+    { symbol: "HON", label: "Honeywell" },
+    { symbol: "UPS", label: "UPS" },
+    { symbol: "DE", label: "Deere" },
+  ],
+  XLB: [
+    { symbol: "LIN", label: "Linde" },
+    { symbol: "APD", label: "Air Products" },
+    { symbol: "SHW", label: "Sherwin-Williams" },
+    { symbol: "ECL", label: "Ecolab" },
+  ],
+  XLU: [
+    { symbol: "NEE", label: "NextEra Energy" },
+    { symbol: "DUK", label: "Duke Energy" },
+    { symbol: "SO", label: "Southern Company" },
+    { symbol: "AEP", label: "American Electric Power" },
+  ],
+  XLRE: [
+    { symbol: "PLD", label: "Prologis" },
+    { symbol: "AMT", label: "American Tower" },
+    { symbol: "EQIX", label: "Equinix" },
+    { symbol: "PSA", label: "Public Storage" },
+  ],
+  XLC: [
+    { symbol: "META", label: "Meta" },
+    { symbol: "GOOGL", label: "Alphabet (Class A)" },
+    { symbol: "NFLX", label: "Netflix" },
+    { symbol: "DIS", label: "Disney" },
+  ],
 };
 
-export function sampleTickersForSector(sectorId: string): readonly string[] {
+export function sampleTickersForSector(sectorId: string): readonly SampleTicker[] {
   return SECTOR_SAMPLE_TICKERS[sectorId] ?? [];
 }

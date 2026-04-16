@@ -62,11 +62,26 @@ export function EmergingSectors() {
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Emerging sectors</h2>
           <p className="mt-1 max-w-xl text-[11px] leading-snug text-zinc-500">
-            Ranked by recent momentum. Open a sector to jump into sample names; each opens charts for that symbol.
+            Sectors are sorted with strongest momentum first. Open a row for example stocks in that group.
+          </p>
+          <p className="mt-2 max-w-xl text-[11px] leading-snug text-zinc-400">
+            <span className="font-medium text-zinc-300">Momentum score</span> (the number on the right) measures how
+            much that sector basket has moved recently—higher means a stronger uptrend. With live market data it is
+            close to a recent percentage change for the sector ETF; without it, the value is a stand-in used only for
+            ordering.
           </p>
         </div>
         <span className="font-mono text-[10px] text-zinc-600">
           {new Date(q.data.asOf).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+        </span>
+      </div>
+      <div className="mb-1.5 flex items-center justify-between border-b border-zinc-800/70 pb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-600">
+        <span>Sector</span>
+        <span
+          className="text-right"
+          title="Higher = stronger recent uptrend for this sector. Uses live returns when connected."
+        >
+          Momentum score
         </span>
       </div>
       <ul className="space-y-2">
@@ -79,35 +94,49 @@ export function EmergingSectors() {
                 <button
                   type="button"
                   onClick={() => setOpenId(open ? null : s.id)}
-                  className="flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left hover:bg-zinc-900/50"
+                  className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-zinc-900/50"
                 >
-                  <span>
+                  <span className="min-w-0 flex-1">
                     <span className="font-mono text-sm text-zinc-100">{s.id}</span>
                     <span className="mt-0.5 block text-[11px] text-zinc-400">{s.name}</span>
                   </span>
-                  <span className="shrink-0 font-mono text-sm tabular-nums text-zinc-200">
-                    {s.momentum.toFixed(2)}
-                    <span className="ml-2 text-[10px] font-normal text-zinc-500">{open ? "▾" : "▸"}</span>
+                  <span className="shrink-0 text-right">
+                    <span className="font-mono text-sm tabular-nums text-zinc-200">{s.momentum.toFixed(2)}</span>
+                    <span className="mt-0.5 block text-[9px] font-normal normal-case tracking-normal text-zinc-500">
+                      momentum score
+                    </span>
+                  </span>
+                  <span className="shrink-0 pt-0.5 w-5 text-center text-xs text-zinc-500" aria-hidden>
+                    {open ? "▾" : "▸"}
                   </span>
                 </button>
                 {open && (
                   <div className="border-t border-zinc-800/80 px-3 py-2">
-                    <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500">Sample names</p>
+                    <p className="mb-2 text-[10px] uppercase tracking-wide text-zinc-500">Example stocks</p>
+                    <p className="mb-3 text-[10px] leading-snug text-zinc-600">
+                      Ticker = exchange symbol. The line under each is the company name (for quick context).
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {samples.map((t) => (
                         <Link
-                          key={t}
-                          href={`/analyze/${t}`}
-                          className="rounded-full border border-zinc-700 bg-zinc-950 px-2.5 py-1 font-mono text-[11px] text-sky-300 hover:border-zinc-500 hover:text-sky-200"
+                          key={t.symbol}
+                          href={`/analyze/${t.symbol}`}
+                          className="inline-flex min-w-[4.5rem] flex-col items-center rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-2 hover:border-zinc-500"
                         >
-                          {t}
+                          <span className="font-mono text-[11px] font-medium text-sky-300">{t.symbol}</span>
+                          <span className="mt-1 max-w-[6.5rem] text-center text-[9px] leading-tight text-zinc-500">
+                            {t.label}
+                          </span>
                         </Link>
                       ))}
                       <Link
                         href={`/analyze/${s.id}`}
-                        className="rounded-full border border-zinc-800 px-2.5 py-1 font-mono text-[11px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                        className="inline-flex min-w-[4.5rem] flex-col items-center rounded-lg border border-zinc-800 bg-zinc-950/80 px-2.5 py-2 hover:border-zinc-600"
                       >
-                        Sector ETF ({s.id})
+                        <span className="font-mono text-[11px] font-medium text-zinc-300">{s.id}</span>
+                        <span className="mt-1 max-w-[6.5rem] text-center text-[9px] leading-tight text-zinc-500">
+                          Sector ETF (tracks this whole group)
+                        </span>
                       </Link>
                     </div>
                   </div>

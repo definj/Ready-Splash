@@ -27,6 +27,10 @@ export function TickerSearchBar() {
   return (
     <div className="rounded border border-zinc-800 bg-zinc-900/40 p-3">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Look up a ticker</h2>
+      <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+        A <span className="text-zinc-400">ticker</span> is the symbol (like AAPL or MSFT) used to trade a stock. Enter
+        letters only, then open its research page.
+      </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <input
           type="text"

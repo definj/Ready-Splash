@@ -81,7 +81,8 @@ export function TickerResearch({ ticker }: { ticker: string }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-zinc-50">{title}</h2>
-          <p className="mt-1 font-mono text-xs text-zinc-500">
+          <p className="mt-1 text-[10px] uppercase tracking-wide text-zinc-600">Trading symbol (ticker)</p>
+          <p className="mt-0.5 font-mono text-xs text-zinc-500">
             {symbol}
             {d.exchange ? ` · ${d.exchange}` : ""}
             {d.currency ? ` · ${d.currency}` : ""}
