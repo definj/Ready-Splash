@@ -1,0 +1,16 @@
+-- TimescaleDB hypertable for OHLCV (run after extension + table exist; not managed by Prisma models)
+-- CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- CREATE TABLE ohlcv (
+--   time        TIMESTAMPTZ NOT NULL,
+--   ticker      TEXT NOT NULL,
+--   open        NUMERIC(18,4),
+--   high        NUMERIC(18,4),
+--   low         NUMERIC(18,4),
+--   close       NUMERIC(18,4),
+--   volume      BIGINT,
+--   vwap        NUMERIC(18,4),
+--   adjusted    BOOLEAN DEFAULT false
+-- );
+-- SELECT create_hypertable('ohlcv', 'time');
+-- CREATE INDEX ON ohlcv (ticker, time DESC);

@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ready
+      POSTGRES_PASSWORD: ready
+      POSTGRES_DB: ready_splash
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  worker:
+    image: node:22-bookworm-slim
+    working_dir: /repo
+    depends_on:
+      - redis
+    environment:
+      API_URL: http://host.docker.internal:4000
+      INTERNAL_CRON_SECRET: ${INTERNAL_CRON_SECRET:-}
+      WORKER_INTERVAL_MS: "3600000"
+    volumes:
+      - ./:/repo
+    command: ["bash", "-lc", "cd /repo && npm run worker"]
+    profiles:
+      - worker
+
+  yfinance-worker:
+    build:
+      context: ./apps/yfinance-worker
+    environment:
+      API_URL: http://host.docker.internal:4000
+      INTERNAL_CRON_SECRET: ${INTERNAL_CRON_SECRET:-}
+      TICKERS: "SPY,QQQ"
+      POLL_INTERVAL_SECONDS: "30"
+    profiles:
+      - yfinance
+
+volumes:
+  pgdata:
+  redisdata:

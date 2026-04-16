@@ -4,8 +4,10 @@
 !.env.example
 node_modules/
 dist/
+packages/*/dist/
 build/
 *.log
+*.tsbuildinfo
 .idea/
 .vscode/*
 !.vscode/extensions.json

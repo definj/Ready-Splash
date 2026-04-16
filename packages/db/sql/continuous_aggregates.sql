@@ -1,0 +1,48 @@
+-- Timescale continuous aggregates (run manually after `ohlcv` hypertable exists).
+-- Requires: CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- Example: 1-minute rollup from tick-level or 1s bars (adjust source hypertable name to match yours).
+-- CREATE MATERIALIZED VIEW ohlcv_1m
+-- WITH (timescaledb.continuous) AS
+-- SELECT
+--   time_bucket('1 minute', time) AS bucket,
+--   ticker,
+--   first(open, time)  AS open,
+--   max(high)           AS high,
+--   min(low)            AS low,
+--   last(close, time)   AS close,
+--   sum(volume)         AS volume
+-- FROM ohlcv
+-- GROUP BY bucket, ticker;
+-- SELECT add_continuous_aggregate_policy('ohlcv_1m',
+--   start_offset => INTERVAL '3 hours',
+--   end_offset   => INTERVAL '1 minute',
+--   schedule_interval => INTERVAL '1 minute');
+
+-- Example: 5-minute rollup
+-- CREATE MATERIALIZED VIEW ohlcv_5m
+-- WITH (timescaledb.continuous) AS
+-- SELECT
+--   time_bucket('5 minutes', time) AS bucket,
+--   ticker,
+--   first(open, time)  AS open,
+--   max(high)           AS high,
+--   min(low)            AS low,
+--   last(close, time)   AS close,
+--   sum(volume)         AS volume
+-- FROM ohlcv
+-- GROUP BY bucket, ticker;
+
+-- Example: daily rollup (if raw table is finer than 1d)
+-- CREATE MATERIALIZED VIEW ohlcv_1d
+-- WITH (timescaledb.continuous) AS
+-- SELECT
+--   time_bucket('1 day', time) AS bucket,
+--   ticker,
+--   first(open, time)  AS open,
+--   max(high)           AS high,
+--   min(low)            AS low,
+--   last(close, time)   AS close,
+--   sum(volume)         AS volume
+-- FROM ohlcv
+-- GROUP BY bucket, ticker;
