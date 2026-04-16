@@ -66,11 +66,7 @@ export function EmergingSectors() {
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Emerging sectors</h2>
           <p className="mt-1 max-w-xl text-[11px] leading-snug text-zinc-500">
-            Sectors are sorted with strongest momentum first. Open a row for example stocks in that group. Hover{" "}
-            <span className="cursor-help border-b border-dotted border-zinc-500 text-zinc-400" title={MOMENTUM_SCORE_TOOLTIP}>
-              momentum score
-            </span>{" "}
-            in the header for a short definition.
+            Sectors are sorted with strongest momentum first. Open a row for example stocks in that group.
           </p>
         </div>
         <span className="font-mono text-[10px] text-zinc-600">
@@ -106,11 +102,8 @@ export function EmergingSectors() {
                     <span className="font-mono text-sm text-zinc-100">{s.id}</span>
                     <span className="mt-0.5 block text-[11px] text-zinc-400">{s.name}</span>
                   </span>
-                  <span className="shrink-0 text-right" title={MOMENTUM_SCORE_TOOLTIP}>
+                  <span className="shrink-0 text-right">
                     <span className="font-mono text-sm tabular-nums text-zinc-200">{s.momentum.toFixed(2)}</span>
-                    <span className="mt-0.5 block cursor-help text-[9px] font-normal normal-case tracking-normal text-zinc-500 underline decoration-dotted decoration-zinc-600 underline-offset-2">
-                      momentum score
-                    </span>
                   </span>
                   <span className="shrink-0 pt-0.5 w-5 text-center text-xs text-zinc-500" aria-hidden>
                     {open ? "▾" : "▸"}
