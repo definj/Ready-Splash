@@ -15,8 +15,8 @@ export function TickerLive({ ticker }: { ticker: string }) {
     queryFn: async (): Promise<MarketTickResponse> => {
       const res = await apiFetch(`/market/ticker/${encodeURIComponent(symbol)}`);
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || res.statusText);
+        await res.text().catch(() => {});
+        throw new Error("QUOTE_UNAVAILABLE");
       }
       return (await res.json()) as MarketTickResponse;
     },
@@ -38,28 +38,18 @@ export function TickerLive({ ticker }: { ticker: string }) {
       </h2>
       {query.isLoading && <p className="mt-2 text-zinc-400">Loading snapshot…</p>}
       {query.error && (
-        <p className="mt-2 text-amber-400">
-          {query.error instanceof Error ? query.error.message : "Failed to load"}
-        </p>
+        <p className="mt-2 text-sm text-zinc-400">Live quote is not available for this symbol right now.</p>
       )}
       {query.data && (
         <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-zinc-200">
-          <dt className="text-zinc-500">Price</dt>
+          <dt className="text-zinc-500">Last</dt>
           <dd>{query.data.price.toFixed(4)}</dd>
-          <dt className="text-zinc-500">Volume (last)</dt>
+          <dt className="text-zinc-500">Volume</dt>
           <dd>{query.data.volume}</dd>
-          <dt className="text-zinc-500">Source</dt>
-          <dd className="text-zinc-300">{query.data.source}</dd>
           <dt className="text-zinc-500">Session</dt>
-          <dd>{query.data.marketOpen ? "regular (RTH)" : "outside RTH"}</dd>
+          <dd>{query.data.marketOpen ? "Regular hours" : "Extended / closed"}</dd>
         </dl>
       )}
-      <p className="mt-3 text-xs text-zinc-500">
-        RTH: WebSocket + Redis. Outside RTH: REST poll every 30s. Configure{" "}
-        <code className="text-zinc-400">NEXT_PUBLIC_API_URL</code>,{" "}
-        <code className="text-zinc-400">POLYGON_API_KEY</code>,{" "}
-        <code className="text-zinc-400">REDIS_URL</code>, and Yahoo fallback for last resort quotes.
-      </p>
     </section>
   );
 }

@@ -16,9 +16,7 @@ export default function AnalyzePage({ params }: PageProps) {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">Analysis · {parsed.data}</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Split- and dividend-adjusted daily bars, RSI, scenario branches, Monte Carlo fan, and live tape.
-        </p>
+        <p className="mt-1 text-sm text-zinc-400">Charts, momentum, outlook scenarios, and a live quote.</p>
       </div>
       <AnalysisChart ticker={parsed.data} />
       <ScenarioPanel ticker={parsed.data} />

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useUIStore } from "@/stores/ui-store";
 
 const nav = [
-  { href: "/", label: "Macro" },
+  { href: "/", label: "Home" },
   { href: "/analyze/AAPL", label: "Analyze" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/watchlist", label: "Watchlist" },

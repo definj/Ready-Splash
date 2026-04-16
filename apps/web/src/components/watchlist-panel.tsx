@@ -36,9 +36,12 @@ export function WatchlistPanel() {
     queryFn: async (): Promise<WatchlistsResponse> => {
       const res = await apiFetch("/watchlists");
       if (res.status === 401) {
-        throw new Error("Sign in via POST /auth/login (cookies) to load watchlists.");
+        throw new Error("SIGN_IN");
       }
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("LOAD_FAILED");
+      }
       return (await res.json()) as WatchlistsResponse;
     },
     retry: false,
@@ -55,7 +58,10 @@ export function WatchlistPanel() {
   const createList = useMutation({
     mutationFn: async () => {
       const res = await apiFetch("/watchlists", { method: "POST", body: JSON.stringify({ name }) });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SAVE_FAILED");
+      }
       return res.json();
     },
     onSuccess: async () => {
@@ -75,7 +81,10 @@ export function WatchlistPanel() {
           alertPrice: alert ? Number(alert) : undefined,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SAVE_FAILED");
+      }
       return res.json();
     },
     onSuccess: async () => {
@@ -86,7 +95,10 @@ export function WatchlistPanel() {
   const removeItem = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiFetch(`/watchlists/items/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SAVE_FAILED");
+      }
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["watchlists"] });
@@ -101,7 +113,10 @@ export function WatchlistPanel() {
         method: "PATCH",
         body: JSON.stringify({ itemIds }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SAVE_FAILED");
+      }
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["watchlists"] });
@@ -193,7 +208,13 @@ export function WatchlistPanel() {
       </div>
 
       {lists.isLoading && <p className="text-xs text-zinc-500">Loading watchlists…</p>}
-      {lists.error && <p className="text-xs text-amber-400">{(lists.error as Error).message}</p>}
+      {lists.error && (
+        <p className="text-xs text-zinc-400">
+          {(lists.error as Error).message === "SIGN_IN"
+            ? "Sign in to load your watchlist."
+            : "Watchlist could not be loaded."}
+        </p>
+      )}
 
       {wl && (
         <div className="rounded border border-zinc-800 bg-zinc-900/30 p-3">

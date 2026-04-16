@@ -50,9 +50,12 @@ export function PortfolioPanel() {
     queryFn: async (): Promise<Summary> => {
       const res = await apiFetch("/portfolio/summary");
       if (res.status === 401) {
-        throw new Error("Sign in via POST /auth/login (cookies) to load portfolio.");
+        throw new Error("SIGN_IN");
       }
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("LOAD_FAILED");
+      }
       return (await res.json()) as Summary;
     },
     retry: false,
@@ -72,7 +75,10 @@ export function PortfolioPanel() {
     enabled: Boolean(tickerCsv),
     queryFn: async (): Promise<QuotesResponse> => {
       const res = await apiFetch(`/market/quotes?tickers=${encodeURIComponent(tickerCsv)}`);
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("QUOTES_FAILED");
+      }
       return (await res.json()) as QuotesResponse;
     },
     staleTime: 30_000,
@@ -92,7 +98,10 @@ export function PortfolioPanel() {
         method: "POST",
         body: JSON.stringify({ label }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SAVE_FAILED");
+      }
       return res.json();
     },
     onSuccess: async () => {
@@ -113,7 +122,10 @@ export function PortfolioPanel() {
           avgCostBasis: Number(cost),
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SAVE_FAILED");
+      }
       return res.json();
     },
     onSuccess: async () => {
@@ -213,7 +225,11 @@ export function PortfolioPanel() {
 
       {summary.isLoading && <p className="text-xs text-zinc-500">Loading portfolio…</p>}
       {summary.error && (
-        <p className="text-xs text-amber-400">{(summary.error as Error).message}</p>
+        <p className="text-xs text-zinc-400">
+          {(summary.error as Error).message === "SIGN_IN"
+            ? "Sign in to load your portfolio."
+            : "Portfolio could not be loaded."}
+        </p>
       )}
 
       {summary.data && (

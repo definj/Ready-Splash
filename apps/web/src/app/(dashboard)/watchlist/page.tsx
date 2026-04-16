@@ -5,9 +5,7 @@ export default function WatchlistPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-zinc-50">Watchlist</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Prisma-backed lists with inline upsert, optional alert prices, and deep links into analysis routes.
-        </p>
+        <p className="mt-1 text-sm text-zinc-400">Build lists, set optional alerts, and open any symbol in analysis.</p>
       </div>
       <WatchlistPanel />
     </div>

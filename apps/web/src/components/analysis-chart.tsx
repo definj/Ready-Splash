@@ -35,7 +35,10 @@ export function AnalysisChart({ ticker }: { ticker: string }) {
       const res = await apiFetch(
         `/market/bars/${encodeURIComponent(ticker)}?limit=180&adjusted=true&dividends=true`,
       );
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("CHART_FAILED");
+      }
       return (await res.json()) as BarsResponse;
     },
   });
@@ -122,11 +125,7 @@ export function AnalysisChart({ ticker }: { ticker: string }) {
   return (
     <div className="space-y-2">
       {q.isLoading && <p className="text-xs text-zinc-500">Loading OHLCV…</p>}
-      {q.error && (
-        <p className="text-xs text-amber-400">
-          {(q.error as Error).message || "Unable to load bars (Polygon key / network)."}
-        </p>
-      )}
+      {q.error && <p className="text-xs text-zinc-400">Price history could not be loaded.</p>}
       {q.data?.disclaimer && (
         <p className="text-[10px] leading-relaxed text-zinc-600">{q.data.disclaimer}</p>
       )}

@@ -33,7 +33,10 @@ export function ScenarioPanel({ ticker }: { ticker: string }) {
       const res = await apiFetch(
         `/analysis/${encodeURIComponent(ticker)}/scenario?horizon=30&paths=800`,
       );
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        await res.text().catch(() => {});
+        throw new Error("SCENARIO_FAILED");
+      }
       return (await res.json()) as ScenarioResponse;
     },
   });
@@ -42,7 +45,7 @@ export function ScenarioPanel({ ticker }: { ticker: string }) {
     return <p className="text-xs text-zinc-500">Loading scenario engine…</p>;
   }
   if (q.error) {
-    return <p className="text-xs text-amber-400">{(q.error as Error).message}</p>;
+    return <p className="text-xs text-zinc-400">Scenario outlook could not be loaded.</p>;
   }
   if (!q.data) return null;
 
@@ -59,10 +62,10 @@ export function ScenarioPanel({ ticker }: { ticker: string }) {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
           Scenario · {scenario.horizon}d horizon
         </h2>
-        <span className="font-mono text-[10px] text-zinc-600">{barsUsed} closes · drift / vol model</span>
+        <span className="font-mono text-[10px] text-zinc-600">Based on {barsUsed} recent sessions</span>
       </div>
       {scenario.ivUnavailable && (
-        <p className="text-[10px] text-zinc-500">Implied vol unavailable — historical vol only.</p>
+        <p className="text-[10px] text-zinc-500">Using historical volatility for this view.</p>
       )}
       <div className="grid gap-2 sm:grid-cols-3">
         {branches.map(({ key, label, b, tone }) => (
@@ -76,9 +79,7 @@ export function ScenarioPanel({ ticker }: { ticker: string }) {
       </div>
       {monteCarlo && (
         <div className="border-t border-zinc-800 pt-3">
-          <h3 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-            Monte Carlo terminal ({monteCarlo.paths} paths)
-          </h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">Simulated range</h3>
           <div className="mt-2 grid grid-cols-2 gap-2 font-mono text-[11px] text-zinc-300 sm:grid-cols-4">
             <div>
               <span className="text-zinc-600">P5</span> {monteCarlo.terminalP5.toFixed(2)}
