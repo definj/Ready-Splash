@@ -5,6 +5,7 @@
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
+    "start": "npm run start -w @ready-splash/api",
     "lint": "turbo lint",
     "db:generate": "npm run db:generate -w @ready-splash/db",
     "db:migrate": "npm run db:migrate -w @ready-splash/db",
