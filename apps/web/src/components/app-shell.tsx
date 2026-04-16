@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Nav
             </button>
             <div className="hidden text-[11px] font-mono text-zinc-500 sm:block">
-              US equities · RTH 09:30–16:00 ET · high-density terminal layout (Phase 5 scaffold)
+              US equities · RTH 09:30–16:00 ET
             </div>
           </div>
           <button

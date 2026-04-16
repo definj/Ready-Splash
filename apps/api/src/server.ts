@@ -1,7 +1,7 @@
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import Fastify from "fastify";
-import { isMarketOpen } from "@ready-splash/indicators";
+import { isMarketOpen } from "@ready-splash/indicators/market-hours";
 import { Server } from "socket.io";
 import { prisma } from "./lib/prisma.js";
 import { disconnectRedis, getRedis } from "./lib/redis.js";

@@ -1,4 +1,4 @@
-import { isMarketOpen } from "@ready-splash/indicators";
+import { isMarketOpen } from "@ready-splash/indicators/market-hours";
 import type { MarketTickResponse } from "@ready-splash/types";
 import { tickerSchema } from "@ready-splash/types";
 import type { FastifyInstance } from "fastify";
